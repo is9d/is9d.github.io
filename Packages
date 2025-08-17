@@ -1,8 +1,11 @@
-Package: test
-Name: My Test 
+Package: mytweak
+Name: My Test Tweak
 Version: 1.0
-Architecture: iphoneos-arm64
-Description: This is a test tweak
+Architecture: iphoneos-arm
+Description: This is a test tweak for repo setup
 Maintainer: is9d
 Author: is9d
 Section: Tweaks
+Filename: debs/mytweak.deb
+Size: 1234
+MD5sum: d41d8cd98f00b204e9800998ecf8427e
