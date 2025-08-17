@@ -1,0 +1,8 @@
+Package: test
+Name: My Test 
+Version: 1.0
+Architecture: iphoneos-arm64
+Description: This is a test tweak
+Maintainer: is9d
+Author: is9d
+Section: Tweaks
