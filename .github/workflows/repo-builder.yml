@@ -1,0 +1,107 @@
+name: Build Repo
+
+on:
+  push:
+    branches:
+      - main   # أو master حسب فرعك
+    paths:
+      - 'debs/**'   # يشتغل فقط إذا رفعت debs
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y dpkg tar python3
+
+      - name: Generate Packages + Depictions
+        run: |
+          mkdir -p depictions
+          python3 <<'EOF'
+          import os, tarfile, tempfile, json
+
+          debs_folder = "debs"
+          depictions_folder = "depictions"
+          os.makedirs(depictions_folder, exist_ok=True)
+          packages_output = []
+
+          def extract_control_from_deb(deb_path):
+              with open(deb_path, "rb") as f:
+                  data = f.read()
+              start = data.find(b"control.tar")
+              if start == -1:
+                  return None
+              temp = tempfile.NamedTemporaryFile(delete=False)
+              temp.write(data[start:])
+              temp.close()
+              with tarfile.open(temp.name) as tar:
+                  control = tar.extractfile("control").read().decode()
+              os.unlink(temp.name)
+              return control
+
+          def parse_control(control_text):
+              info = {}
+              for line in control_text.splitlines():
+                  if ":" in line:
+                      key, value = line.split(":", 1)
+                      info[key.strip()] = value.strip()
+              return info
+
+          def create_depiction(package, version, description):
+              template = {
+                "minVersion": "0.1",
+                "headerImage": "",
+                "tintColor": "#5AC8FA",
+                "tabs": [
+                  {
+                    "tabname": "Details",
+                    "views": [
+                      {
+                        "title": package,
+                        "markdown": description
+                      }
+                    ]
+                  },
+                  {
+                    "tabname": "Changelog",
+                    "views": [
+                      {
+                        "title": f"الإصدار {version}",
+                        "markdown": f"- أول إصدار للأداة {package}"
+                      }
+                    ]
+                  }
+                ]
+              }
+              with open(f"{depictions_folder}/{package}.json", "w", encoding="utf-8") as f:
+                  json.dump(template, f, ensure_ascii=False, indent=2)
+
+          for filename in os.listdir(debs_folder):
+              if filename.endswith(".deb"):
+                  path = os.path.join(debs_folder, filename)
+                  control_text = extract_control_from_deb(path)
+                  if control_text:
+                      info = parse_control(control_text)
+                      package = info.get("Package", "unknown")
+                      version = info.get("Version", "1.0")
+                      description = info.get("Description", "بدون وصف")
+                      create_depiction(package, version, description)
+                      entry = control_text.strip() + f"\\nSileoDepiction: https://is9d.github.io/depictions/{package}.json\\n"
+                      packages_output.append(entry)
+                      print(f"✅ {package} done")
+
+          with open("Packages", "w", encoding="utf-8") as f:
+              f.write("\\n\\n".join(packages_output))
+          EOF
+
+      - name: Commit changes
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add Packages depictions/
+          git commit -m "Update repo metadata" || echo "No changes"
+          git push
